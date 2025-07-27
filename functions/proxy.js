@@ -2,19 +2,14 @@ const https = require('https');
 
 exports.handler = async (event) => {
   try {
-    // 1. 组装目标URL
-    const path = event.rawUrl
-      ? new URL(event.rawUrl).pathname + (new URL(event.rawUrl).search || '')
-      : event.path;
-    const targetUrl = `https://api.themoviedb.org${path}`;
+    // 1. 获取原始请求的 path 和 query
+    const path = event.path || '/';
+    const query = event.rawQuery || '';
+    const targetUrl = `https://api.themoviedb.org${path}${query ? '?' + query : ''}`;
 
-    // 2. 组装请求选项
-    const options = {
-      method: event.httpMethod,
-      headers: { ...event.headers },
-    };
-    // 移除host头，防止冲突
-    delete options.headers.host;
+    // 2. 复制 headers，并设置 Host
+    const headers = { ...event.headers };
+    headers['host'] = 'api.themoviedb.org';
 
     // 3. 处理请求体
     let requestBody = null;
@@ -22,19 +17,21 @@ exports.handler = async (event) => {
       requestBody = event.isBase64Encoded
         ? Buffer.from(event.body, 'base64')
         : event.body;
-      options.headers['Content-Length'] = Buffer.byteLength(requestBody);
     }
 
     // 4. 发起代理请求
     return await new Promise((resolve) => {
-      const req = https.request(targetUrl, options, (res) => {
+      const req = https.request(targetUrl, {
+        method: event.httpMethod,
+        headers,
+      }, (res) => {
         let responseBody = [];
         res.on('data', (chunk) => responseBody.push(chunk));
         res.on('end', () => {
           const bodyBuffer = Buffer.concat(responseBody);
-          // 组装响应头
+          // 复制响应头
           const responseHeaders = { ...res.headers };
-          // CORS支持
+          // CORS 支持
           responseHeaders['access-control-allow-origin'] = '*';
           responseHeaders['access-control-allow-headers'] = '*';
           responseHeaders['access-control-allow-methods'] = '*';

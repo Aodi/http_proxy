@@ -2,11 +2,14 @@ const https = require('https');
 
 exports.handler = async (event) => {
   try {
+    // 1. 获取 path 和 query
+    const path = event.path.startsWith('/.netlify/functions/proxy') 
+      ? event.path.replace('/.netlify/functions/proxy', '') 
+      : event.path;
+    
     // 调试日志 - 打印完整事件对象
     console.log('Incoming event:', JSON.stringify(event, null, 2));
-    
-    // 1. 获取 path 和 query
-    const path = event.path || '/';
+
     let query = '';
     if (event.queryStringParameters && Object.keys(event.queryStringParameters).length > 0) {
       query = '?' + Object.entries(event.queryStringParameters)

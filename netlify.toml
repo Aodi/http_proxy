@@ -2,6 +2,13 @@
   functions = "functions"
   publish = "public"
 
+# 重定向所有API路径到函数
+[[redirects]]
+  from = "/"
+  to = "/.netlify/functions/proxy/:splat"
+  status = 200
+  force = true
+
 # 根路径 - 显示Web界面
 [[redirects]]
   from = "/"

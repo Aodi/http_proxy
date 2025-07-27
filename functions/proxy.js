@@ -2,13 +2,21 @@ const https = require('https');
 
 exports.handler = async (event) => {
   try {
-    // 1. 获取原始请求的 path 和 query
+    // 1. 获取 path 和 query
     const path = event.path || '/';
-    const query = event.rawQuery || '';
-    const targetUrl = `https://api.themoviedb.org${path}${query ? '?' + query : ''}`;
+    let query = '';
+    if (event.queryStringParameters && Object.keys(event.queryStringParameters).length > 0) {
+      query = '?' + Object.entries(event.queryStringParameters)
+        .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+        .join('&');
+    }
+    const targetUrl = `https://api.themoviedb.org${path}${query}`;
 
-    // 2. 复制 headers，并设置 Host
+    // 2. 复制 headers，移除/重写部分头部
     const headers = { ...event.headers };
+    delete headers['host'];
+    delete headers['connection'];
+    delete headers['content-length'];
     headers['host'] = 'api.themoviedb.org';
 
     // 3. 处理请求体
@@ -29,9 +37,7 @@ exports.handler = async (event) => {
         res.on('data', (chunk) => responseBody.push(chunk));
         res.on('end', () => {
           const bodyBuffer = Buffer.concat(responseBody);
-          // 复制响应头
           const responseHeaders = { ...res.headers };
-          // CORS 支持
           responseHeaders['access-control-allow-origin'] = '*';
           responseHeaders['access-control-allow-headers'] = '*';
           responseHeaders['access-control-allow-methods'] = '*';
@@ -44,6 +50,7 @@ exports.handler = async (event) => {
         });
       });
       req.on('error', (err) => {
+        console.error('Proxy error:', err);
         resolve({
           statusCode: 502,
           body: JSON.stringify({ error: 'Proxy error', message: err.message }),
@@ -54,6 +61,7 @@ exports.handler = async (event) => {
       req.end();
     });
   } catch (error) {
+    console.error('Proxy error:', error);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: 'Internal error', message: error.message }),
